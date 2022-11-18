@@ -29,6 +29,13 @@ pub mod flash_loan_mastery {
 
     /// Initialize a lending pool
     pub fn init_pool(ctx: Context<InitPool>) -> Result<()> {
+        let mut pool_authority = ctx.accounts.pool_authority.load_init()?;
+        *pool_authority = PoolAuthority {
+            mint: ctx.accounts.mint.key(),
+            pool_share_mint: ctx.accounts.pool_share_mint.key(),
+            bump: *ctx.bumps.get("pool_authority").unwrap(),
+        };
+
         anchor_spl::token::set_authority(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
@@ -82,7 +89,7 @@ pub mod flash_loan_mastery {
         let pool_authority_seeds = [
             POOL_SEED,
             mint_bytes.as_ref(),
-            &[*ctx.bumps.get("pool_authority").unwrap()],
+            &[ctx.accounts.pool_authority.load()?.bump],
         ];
 
         // set `delegated_amount` (keeps track of total deposit amount)
@@ -148,7 +155,7 @@ pub mod flash_loan_mastery {
         let pool_authority_seeds = [
             POOL_SEED,
             mint_bytes.as_ref(),
-            &[*ctx.bumps.get("pool_authority").unwrap()],
+            &[ctx.accounts.pool_authority.load()?.bump],
         ];
 
         // transfer from pool
@@ -239,7 +246,7 @@ pub mod flash_loan_mastery {
         let pool_authority_seeds = [
             POOL_SEED,
             mint_bytes.as_ref(),
-            &[*ctx.bumps.get("pool_authority").unwrap()],
+            &[ctx.accounts.pool_authority.load()?.bump],
         ];
 
         // transfer from pool to borrower
@@ -308,11 +315,32 @@ pub mod flash_loan_mastery {
     }
 }
 
+/// `PoolAuthority` account
+#[account(zero_copy)]
+#[repr(packed)]
+#[derive(Debug)]
+pub struct PoolAuthority {
+    /// The token mint
+    pub mint: Pubkey,
+    /// The `pool_share_mint`
+    pub pool_share_mint: Pubkey,
+    /// The PDA bump
+    pub bump: u8,
+}
+
+impl PoolAuthority {
+    const LEN: usize = 8 + 1 + 32 + 32;
+}
+
 /// Accounts for `InitPool`
 // `Mint` and `Token` don't implement `Debug`...
 #[allow(missing_debug_implementations)]
 #[derive(Accounts)]
 pub struct InitPool<'info> {
+    /// The funder for the `pool_authority` account
+    #[account(mut)]
+    pub funder: Signer<'info>,
+
     /// The mint representing the token that will be borrowed via flash loans
     pub mint: Account<'info, Mint>,
 
@@ -328,18 +356,23 @@ pub struct InitPool<'info> {
     pub pool_share_mint_authority: Signer<'info>,
 
     /// The pool authority
-    /// CHECK: checked with seeds
     #[account(
+        init,
+        payer = funder,
+        space = PoolAuthority::LEN,
         seeds = [
             POOL_SEED,
             mint.key().as_ref(),
         ],
         bump,
     )]
-    pub pool_authority: UncheckedAccount<'info>,
+    pub pool_authority: AccountLoader<'info, PoolAuthority>,
 
     /// The [Token] program
     pub token_program: Program<'info, Token>,
+
+    /// The Solana System program
+    pub system_program: Program<'info, System>,
 }
 
 /// Accounts for `Deposit`
@@ -358,7 +391,7 @@ pub struct Deposit<'info> {
     /// The token to receive tokens deposited into the pool
     #[account(
         mut,
-        constraint = token_to.owner == *pool_authority.key,
+        constraint = token_to.owner == pool_authority.key(),
     )]
     pub token_to: Account<'info, TokenAccount>,
 
@@ -368,7 +401,7 @@ pub struct Deposit<'info> {
     pub pool_share_token_to: UncheckedAccount<'info>,
 
     /// The mint of the token representing shares in the pool
-    #[account(mut)]
+    #[account(mut, address = pool_authority.load()?.pool_share_mint)]
     pub pool_share_mint: Account<'info, Mint>,
 
     /// The pool authority
@@ -379,9 +412,9 @@ pub struct Deposit<'info> {
             POOL_SEED,
             token_to.mint.key().as_ref(),
         ],
-        bump,
+        bump = pool_authority.load()?.bump,
     )]
-    pub pool_authority: UncheckedAccount<'info>,
+    pub pool_authority: AccountLoader<'info, PoolAuthority>,
 
     /// The [Token] program
     pub token_program: Program<'info, Token>,
@@ -410,7 +443,7 @@ pub struct Withdraw<'info> {
     pub pool_share_token_from: UncheckedAccount<'info>,
 
     /// The mint of the token representing shares in the pool
-    #[account(mut)]
+    #[account(mut, address = pool_authority.load()?.pool_share_mint)]
     pub pool_share_mint: Account<'info, Mint>,
 
     /// The pool authority
@@ -421,9 +454,9 @@ pub struct Withdraw<'info> {
             POOL_SEED,
             token_from.mint.key().as_ref(),
         ],
-        bump,
+        bump = pool_authority.load()?.bump,
     )]
-    pub pool_authority: UncheckedAccount<'info>,
+    pub pool_authority: AccountLoader<'info, PoolAuthority>,
 
     /// The [Token] program
     pub token_program: Program<'info, Token>,
@@ -453,9 +486,9 @@ pub struct Borrow<'info> {
             POOL_SEED,
             token_from.mint.key().as_ref(),
         ],
-        bump,
+        bump = pool_authority.load()?.bump,
     )]
-    pub pool_authority: UncheckedAccount<'info>,
+    pub pool_authority: AccountLoader<'info, PoolAuthority>,
 
     /// Solana Instructions Sysvar
     /// CHECK: Checked using address
@@ -482,7 +515,7 @@ pub struct Repay<'info> {
     /// The token to receive tokens repaid into the pool
     #[account(
         mut,
-        constraint = token_to.owner == *pool_authority.key,
+        constraint = token_to.owner == pool_authority.key(),
     )]
     pub token_to: Account<'info, TokenAccount>,
 
@@ -500,9 +533,9 @@ pub struct Repay<'info> {
             POOL_SEED,
             token_to.mint.key().as_ref(),
         ],
-        bump,
+        bump = pool_authority.load()?.bump,
     )]
-    pub pool_authority: UncheckedAccount<'info>,
+    pub pool_authority: AccountLoader<'info, PoolAuthority>,
 
     /// Solana Instructions Sysvar
     /// CHECK: Checked using address
