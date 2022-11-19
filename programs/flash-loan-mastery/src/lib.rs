@@ -197,6 +197,11 @@ pub mod flash_loan_mastery {
                             ctx.accounts.token_from.key(),
                             FlashLoanError::AddressMismatch
                         );
+                        require_keys_eq!(
+                            ixn.accounts[4].pubkey,
+                            ctx.accounts.pool_authority.key(),
+                            FlashLoanError::PoolMismatch
+                        );
                         let repay_ix_amount =
                             u64::from_le_bytes(ixn.data[8..16].try_into().unwrap());
                         require_gte!(
@@ -316,11 +321,11 @@ pub struct InitPool<'info> {
     /// The mint representing the token that will be borrowed via flash loans
     pub mint: Account<'info, Mint>,
 
-    /// The mint of the token that will represent shares in a given pool
+    /// The mint of the token that will represent shares in the new pool
     #[account(
         mut,
-        constraint = pool_share_mint.decimals == mint.decimals,
-        constraint = pool_share_mint.supply == 0,
+        constraint = pool_share_mint.decimals == mint.decimals @FlashLoanError::InvalidMintDecimals,
+        constraint = pool_share_mint.supply == 0 @FlashLoanError::InvalidMintSupply,
     )]
     pub pool_share_mint: Account<'info, Mint>,
 
@@ -511,7 +516,7 @@ pub struct Repay<'info> {
 
     /// Solana Instructions Sysvar
     /// CHECK: Checked using address
-    #[account(address = sysvar::instructions::ID)]
+    #[account(address = sysvar::instructions::ID @FlashLoanError::AddressMismatch)]
     pub instructions_sysvar: UncheckedAccount<'info>,
 
     /// The [Token] program
@@ -525,8 +530,14 @@ pub enum FlashLoanError {
     AddressMismatch,
     #[msg("Owner Mismatch")]
     OwnerMismatch,
+    #[msg("Pool Mismatch")]
+    PoolMismatch,
     #[msg("Program Mismatch")]
     ProgramMismatch,
+    #[msg("Invalid Mint Supply")]
+    InvalidMintSupply,
+    #[msg("Invalid Mint Decimals")]
+    InvalidMintDecimals,
     #[msg("Cannot Borrow Before Repay")]
     CannotBorrowBeforeRepay,
     #[msg("There is no repayment instruction")]
