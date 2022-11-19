@@ -463,8 +463,14 @@ describe("flash-loan-mastery", () => {
       })
       .instruction();
 
-    const totalFees = amount1.mul(new BN(1000)).div(new BN(10000));
-    const adminFee = amount1.mul(new BN(100)).div(new BN(10000));
+    const totalFees = amount1
+      .mul(new BN(950))
+      .div(new BN(10000))
+      .div(new BN(100));
+    const adminFee = amount1
+      .mul(new BN(50))
+      .div(new BN(10000))
+      .div(new BN(100));
     const repaymentAmount = amount1.add(totalFees);
     const repayIx = await program.methods
       .repay(repaymentAmount)
@@ -572,7 +578,7 @@ describe("flash-loan-mastery", () => {
                 tokenProgram: TOKEN_PROGRAM_ID,
               })
               .instruction(),
-            createTransferInstruction(repayerFrom, lenderFrom, wallet, 200_234),
+            createTransferInstruction(repayerFrom, lenderFrom, wallet, 1337),
           ]
         )
       );

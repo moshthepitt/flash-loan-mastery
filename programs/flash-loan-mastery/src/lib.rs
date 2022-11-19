@@ -19,9 +19,12 @@ use static_pubkey::static_pubkey;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
-pub static LOAN_FEE: u64 = 900;
-pub static ADMIN_FEE: u64 = 100;
-pub static LOAN_FEE_DENOMINATOR: u64 = 10000;
+// with these numbers total loan fee is 0.095%
+pub static LOAN_FEE: u128 = 900;
+pub static ADMIN_FEE: u128 = 50;
+pub static LOAN_FEE_DENOMINATOR: u128 = 10000;
+pub static ONE_HUNDRED: u128 = 100;
+
 pub static POOL_SEED: &[u8] = b"flash_loan";
 pub static ADMIN_KEY: Pubkey = static_pubkey!("44fVncfVm5fB8VsRBwVZW75FdR1nSVUKcf9nUa4ky6qN");
 
@@ -170,12 +173,15 @@ pub mod flash_loan_mastery {
         // make sure this isn't a cpi call
         let current_idx = load_current_index_checked(&instructions_sysvar)? as usize;
         let current_ixn = load_instruction_at_checked(current_idx, &instructions_sysvar)?;
-        require_keys_eq!(current_ixn.program_id, crate::ID, FlashLoanError::ProgramMismatch);
+        require_keys_eq!(
+            current_ixn.program_id,
+            crate::ID,
+            FlashLoanError::ProgramMismatch
+        );
 
         // get expected repay amount
         let fee = u64::try_from(
-            u128::from(amount) * u128::from(LOAN_FEE + ADMIN_FEE)
-                / u128::from(LOAN_FEE_DENOMINATOR),
+            u128::from(amount) * (LOAN_FEE + ADMIN_FEE) / (LOAN_FEE_DENOMINATOR * ONE_HUNDRED),
         )
         .unwrap();
         let expected_repayment = amount.checked_add(fee).unwrap();
@@ -254,14 +260,17 @@ pub mod flash_loan_mastery {
             sysvar::instructions::load_current_index_checked(&instructions_sysvar)? as usize;
         let current_ixn =
             sysvar::instructions::load_instruction_at_checked(current_idx, &instructions_sysvar)?;
-        require_keys_eq!(current_ixn.program_id, crate::ID, FlashLoanError::ProgramMismatch);
+        require_keys_eq!(
+            current_ixn.program_id,
+            crate::ID,
+            FlashLoanError::ProgramMismatch
+        );
 
         // get admin fee
-        let original_amt = u128::from(LOAN_FEE_DENOMINATOR) * u128::from(amount)
-            / u128::from(LOAN_FEE_DENOMINATOR + LOAN_FEE + ADMIN_FEE);
+        let original_amt = LOAN_FEE_DENOMINATOR * ONE_HUNDRED * u128::from(amount)
+            / ((LOAN_FEE_DENOMINATOR * ONE_HUNDRED) + LOAN_FEE + ADMIN_FEE);
         let admin_fee =
-            u64::try_from(original_amt * u128::from(ADMIN_FEE) / u128::from(LOAN_FEE_DENOMINATOR))
-                .unwrap();
+            u64::try_from(original_amt * ADMIN_FEE / (LOAN_FEE_DENOMINATOR * ONE_HUNDRED)).unwrap();
 
         // transfer into pool (borrowed amount + loan fee)
         anchor_spl::token::transfer(
