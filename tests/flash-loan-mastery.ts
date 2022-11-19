@@ -303,8 +303,92 @@ describe("flash-loan-mastery", () => {
     expect(
       Number(poolShareTokenToAccAfter3.amount) /
         Number(poolShareMintAccAfter3.supply)
-    ).eq(
-      100 / Number(poolShareMintAccAfter3.supply)
+    ).eq(100 / Number(poolShareMintAccAfter3.supply));
+  });
+
+  it("withdraw from pool", async () => {
+    const tokenTo = await getAssociatedTokenAddress(
+      tokenMint.publicKey,
+      wallet
     );
+    const tokenFrom = await getAssociatedTokenAddress(
+      tokenMint.publicKey,
+      poolAuthorityKey,
+      true
+    );
+    const poolShareTokenFrom = await getAssociatedTokenAddress(
+      poolMint.publicKey,
+      wallet
+    );
+
+    let tokenToBefore = await getAccount(
+      program.provider.connection,
+      tokenTo,
+      "processed"
+    );
+    let tokenFromBefore = await getAccount(
+      program.provider.connection,
+      tokenFrom,
+      "processed"
+    );
+    let poolShareTokenFromBefore = await getAccount(
+      program.provider.connection,
+      poolShareTokenFrom,
+      "processed"
+    );
+    let poolShareMintAccBefore = await getMint(
+      program.provider.connection,
+      poolMint.publicKey,
+      "processed"
+    );
+
+    const amount1 = new BN(50);
+    await program.provider.sendAndConfirm(
+      new anchor.web3.Transaction().add(
+        await program.methods
+          .withdraw(amount1)
+          .accountsStrict({
+            withdrawer: wallet,
+            tokenFrom,
+            tokenTo,
+            poolShareTokenFrom,
+            poolShareMint: poolMint.publicKey,
+            poolAuthority: poolAuthorityKey,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          })
+          .instruction()
+      )
+    );
+
+    let tokenToAfter = await getAccount(
+      program.provider.connection,
+      tokenTo,
+      "processed"
+    );
+    let tokenFromAfter = await getAccount(
+      program.provider.connection,
+      tokenFrom,
+      "processed"
+    );
+    let poolShareTokenFromAfter = await getAccount(
+      program.provider.connection,
+      poolShareTokenFrom,
+      "processed"
+    );
+    let poolShareMintAccAfter = await getMint(
+      program.provider.connection,
+      poolMint.publicKey,
+      "processed"
+    );
+
+    const tokenValue = Math.floor(
+      (amount1.toNumber() * Number(tokenFromBefore.amount)) /
+        Number(poolShareMintAccBefore.supply)
+    );
+    expect(poolShareTokenFromAfter.amount).equals(poolShareTokenFromBefore.amount - BigInt(amount1.toString()));
+    expect(poolShareMintAccAfter.supply).equals(poolShareMintAccBefore.supply - BigInt(amount1.toString()));
+    expect(tokenFromAfter.amount).equals(tokenFromBefore.amount - BigInt(tokenValue));
+    expect(tokenFromAfter.delegatedAmount).equals(tokenFromBefore.delegatedAmount - BigInt(amount1.toString()));
+    expect(tokenToAfter.amount).equals(tokenToBefore.amount + BigInt(tokenValue));
   });
 });
