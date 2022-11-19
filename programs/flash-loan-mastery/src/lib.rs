@@ -171,7 +171,7 @@ pub mod flash_loan_mastery {
         // make sure this isn't a cpi call
         let current_idx = load_current_index_checked(&instructions_sysvar)? as usize;
         let current_ixn = load_instruction_at_checked(current_idx, &instructions_sysvar)?;
-        require_keys_eq!(current_ixn.program_id, crate::ID);
+        require_keys_eq!(current_ixn.program_id, crate::ID, FlashLoanError::ProgramMismatch);
 
         // get expected repay amount
         let fee = u64::try_from(
@@ -198,10 +198,8 @@ pub mod flash_loan_mastery {
                             ctx.accounts.token_from.key(),
                             FlashLoanError::AddressMismatch
                         );
-                        // msg!("expected_repayment {:?}", expected_repayment);
                         let repay_ix_amount =
                             u64::from_le_bytes(ixn.data[8..16].try_into().unwrap());
-                        // msg!("repay_ix_amount {:?}", repay_ix_amount);
                         require_gte!(
                             repay_ix_amount,
                             expected_repayment,
@@ -252,7 +250,7 @@ pub mod flash_loan_mastery {
             sysvar::instructions::load_current_index_checked(&instructions_sysvar)? as usize;
         let current_ixn =
             sysvar::instructions::load_instruction_at_checked(current_idx, &instructions_sysvar)?;
-        require_keys_eq!(current_ixn.program_id, crate::ID);
+        require_keys_eq!(current_ixn.program_id, crate::ID, FlashLoanError::ProgramMismatch);
 
         // get admin fee
         let original_amt = u128::from(LOAN_FEE_DENOMINATOR) * u128::from(amount)
@@ -528,6 +526,8 @@ pub enum FlashLoanError {
     AddressMismatch,
     #[msg("Owner Mismatch")]
     OwnerMismatch,
+    #[msg("Program Mismatch")]
+    ProgramMismatch,
     #[msg("Cannot Borrow Before Repay")]
     CannotBorrowBeforeRepay,
     #[msg("There is no repayment instruction")]
