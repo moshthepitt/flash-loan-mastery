@@ -1,4 +1,9 @@
-import { PublicKey, Keypair, SystemProgram } from "@solana/web3.js";
+import {
+  PublicKey,
+  Keypair,
+  SystemProgram,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
+} from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
 import { BN, Program } from "@project-serum/anchor";
 import {
@@ -27,6 +32,9 @@ describe("flash-loan-mastery", () => {
   const depositor2 = new Keypair();
   const depositor3 = new Keypair();
   let poolAuthorityKey: PublicKey;
+  const adminKey = new PublicKey(
+    "44fVncfVm5fB8VsRBwVZW75FdR1nSVUKcf9nUa4ky6qN"
+  );
 
   it("init pool", async () => {
     // set up the mint and token accounts
@@ -112,7 +120,7 @@ describe("flash-loan-mastery", () => {
         tokenMint.publicKey,
         await getAssociatedTokenAddress(tokenMint.publicKey, wallet),
         wallet,
-        100_000
+        100_000_000
       )
     );
     // create pool share account for depositor2
@@ -166,7 +174,7 @@ describe("flash-loan-mastery", () => {
       depositor3.publicKey
     );
 
-    const amount1 = new BN(100);
+    const amount1 = new BN(100_000);
     const ix = await program.methods
       .deposit(amount1)
       .accountsStrict({
@@ -209,7 +217,7 @@ describe("flash-loan-mastery", () => {
     ).eq(1);
 
     // deposit again, different account
-    const amount2 = new BN(100);
+    const amount2 = new BN(100_000);
     await program.provider.sendAndConfirm(
       new anchor.web3.Transaction().add(
         await program.methods
@@ -251,7 +259,7 @@ describe("flash-loan-mastery", () => {
     ).eq(0.5);
 
     // simulate pool profits by transferring directly to pool
-    const profits = 77;
+    const profits = 234_567;
     await program.provider.sendAndConfirm(
       new anchor.web3.Transaction().add(
         createTransferInstruction(tokenFrom, tokenTo, wallet, profits)
@@ -264,7 +272,7 @@ describe("flash-loan-mastery", () => {
     );
 
     // deposit again, yet another different account
-    const amount3 = new BN(33);
+    const amount3 = new BN(33_000);
     await program.provider.sendAndConfirm(
       new anchor.web3.Transaction().add(
         await program.methods
@@ -299,11 +307,11 @@ describe("flash-loan-mastery", () => {
     expect(Number(poolShareMintAccAfter3.supply)).equals(
       amount1.add(amount2).toNumber() + depositor3Shares
     );
-    // ~44% of pool shares
+    // ~46% of pool shares
     expect(
       Number(poolShareTokenToAccAfter3.amount) /
         Number(poolShareMintAccAfter3.supply)
-    ).eq(100 / Number(poolShareMintAccAfter3.supply));
+    ).eq(100_000 / Number(poolShareMintAccAfter3.supply));
   });
 
   it("withdraw from pool", async () => {
@@ -385,10 +393,155 @@ describe("flash-loan-mastery", () => {
       (amount1.toNumber() * Number(tokenFromBefore.amount)) /
         Number(poolShareMintAccBefore.supply)
     );
-    expect(poolShareTokenFromAfter.amount).equals(poolShareTokenFromBefore.amount - BigInt(amount1.toString()));
-    expect(poolShareMintAccAfter.supply).equals(poolShareMintAccBefore.supply - BigInt(amount1.toString()));
-    expect(tokenFromAfter.amount).equals(tokenFromBefore.amount - BigInt(tokenValue));
-    expect(tokenFromAfter.delegatedAmount).equals(tokenFromBefore.delegatedAmount - BigInt(amount1.toString()));
-    expect(tokenToAfter.amount).equals(tokenToBefore.amount + BigInt(tokenValue));
+    expect(poolShareTokenFromAfter.amount).equals(
+      poolShareTokenFromBefore.amount - BigInt(amount1.toString())
+    );
+    expect(poolShareMintAccAfter.supply).equals(
+      poolShareMintAccBefore.supply - BigInt(amount1.toString())
+    );
+    expect(tokenFromAfter.amount).equals(
+      tokenFromBefore.amount - BigInt(tokenValue)
+    );
+    expect(tokenFromAfter.delegatedAmount).equals(
+      tokenFromBefore.delegatedAmount - BigInt(amount1.toString())
+    );
+    expect(tokenToAfter.amount).equals(
+      tokenToBefore.amount + BigInt(tokenValue)
+    );
+  });
+
+  it("borrow from pool", async () => {
+    const lenderFrom = await getAssociatedTokenAddress(
+      tokenMint.publicKey,
+      poolAuthorityKey,
+      true
+    );
+    const borrowerTo = await getAssociatedTokenAddress(
+      tokenMint.publicKey,
+      depositor2.publicKey
+    );
+    const repayerFrom = await getAssociatedTokenAddress(
+      tokenMint.publicKey,
+      wallet,
+      true
+    );
+    const adminTokenTo = await getAssociatedTokenAddress(
+      tokenMint.publicKey,
+      adminKey
+    );
+
+    let lenderFromBefore = await getAccount(
+      program.provider.connection,
+      lenderFrom,
+      "processed"
+    );
+    let repayerFromBefore = await getAccount(
+      program.provider.connection,
+      repayerFrom,
+      "processed"
+    );
+
+    const createDepositor2TokenIx = createAssociatedTokenAccountInstruction(
+      wallet,
+      borrowerTo,
+      depositor2.publicKey,
+      tokenMint.publicKey
+    );
+    const createAdminTokenIx = createAssociatedTokenAccountInstruction(
+      wallet,
+      adminTokenTo,
+      adminKey,
+      tokenMint.publicKey
+    );
+    // console.log('lenderFromBefore.amount', lenderFromBefore.amount);
+    // console.log('lenderFromBefore.delegatedAmount', lenderFromBefore.delegatedAmount);
+    // const amount1 = new BN(Number(lenderFromBefore.amount));
+    const amount1 = new BN(100_777);
+    const borrowIx = await program.methods
+      .borrow(amount1)
+      .accountsStrict({
+        borrower: wallet,
+        tokenFrom: lenderFrom,
+        tokenTo: borrowerTo,
+        poolAuthority: poolAuthorityKey,
+        instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .instruction();
+
+    const totalFees = amount1.mul(new BN(1000)).div(new BN(10000));
+    const adminFee = amount1.mul(new BN(100)).div(new BN(10000));
+    const repaymentAmount = amount1.add(totalFees);
+    const repayIx = await program.methods
+      .repay(repaymentAmount)
+      .accountsStrict({
+        repayer: wallet,
+        tokenFrom: repayerFrom,
+        tokenTo: lenderFrom,
+        adminTokenTo,
+        poolAuthority: poolAuthorityKey,
+        instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .instruction();
+
+    const txid = await program.provider.sendAndConfirm(
+      new anchor.web3.Transaction().add(
+        ...[createDepositor2TokenIx, borrowIx, createAdminTokenIx, repayIx]
+      )
+    );
+    console.log(txid);
+    let lenderFromAfter = await getAccount(
+      program.provider.connection,
+      lenderFrom,
+      "processed"
+    );
+    let borrowerToAfter = await getAccount(
+      program.provider.connection,
+      borrowerTo,
+      "processed"
+    );
+    let repayerFromAfter = await getAccount(
+      program.provider.connection,
+      repayerFrom,
+      "processed"
+    );
+    let adminTokenToAfter = await getAccount(
+      program.provider.connection,
+      adminTokenTo,
+      "processed"
+    );
+
+    expect(repayerFromAfter.amount).equals(
+      repayerFromBefore.amount - BigInt(repaymentAmount.toNumber())
+    );
+    expect(borrowerToAfter.amount).equals(BigInt(amount1.toNumber()));
+    expect(adminTokenToAfter.amount).equals(BigInt(adminFee.toNumber()));
+    console.log("lenderFromBefore.amount", lenderFromBefore.amount);
+    console.log("lenderFromAfter.amount", lenderFromAfter.amount);
+    console.log("difference", lenderFromAfter.amount - lenderFromBefore.amount);
+    console.log("totalFees", totalFees.toNumber());
+    console.log("repaymentAmount", repaymentAmount.toNumber());
+    console.log("adminFee", adminFee.toNumber());
+    console.log(
+      "wtf",
+      new BN(lenderFromBefore.amount.toString())
+        .add(totalFees)
+        .sub(adminFee)
+        .toNumber()
+    );
+    console.log(
+      "allllll",
+      new BN(lenderFromBefore.amount.toString())
+        .add(repaymentAmount)
+        .sub(adminFee)
+        .toNumber()
+    );
+    expect(Number(lenderFromAfter.amount)).equals(
+      new BN(lenderFromBefore.amount.toString())
+        .add(totalFees)
+        .sub(adminFee)
+        .toNumber()
+    );
   });
 });

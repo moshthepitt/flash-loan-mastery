@@ -11,6 +11,9 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program;
 use anchor_lang::solana_program::hash::hashv;
 use anchor_lang::solana_program::sysvar;
+use anchor_lang::solana_program::sysvar::instructions::{
+    load_current_index_checked, load_instruction_at_checked,
+};
 use anchor_spl::token::{Mint, Token, TokenAccount};
 // use sha2_const::Sha256;
 use static_pubkey::static_pubkey;
@@ -22,6 +25,15 @@ pub static ADMIN_FEE: u64 = 100;
 pub static LOAN_FEE_DENOMINATOR: u64 = 10000;
 pub static POOL_SEED: &[u8] = b"flash_loan";
 pub static ADMIN_KEY: Pubkey = static_pubkey!("44fVncfVm5fB8VsRBwVZW75FdR1nSVUKcf9nUa4ky6qN");
+
+#[must_use]
+/// Get the Anchor instruction identifier
+/// This is documented [here](https://github.com/project-serum/anchor/blob/9e070870f4815849e99f19700d675638d3443b8f/lang/syn/src/codegen/program/dispatch.rs#L119)
+pub fn get_instruction_discriminator(namespace: &[&[u8]]) -> u64 {
+    let mut discriminator = [0u8; 8];
+    discriminator.copy_from_slice(&hashv(namespace).to_bytes()[..8]);
+    u64::from_be_bytes(discriminator)
+}
 
 #[program]
 #[allow(clippy::needless_pass_by_value)]
@@ -193,49 +205,50 @@ pub mod flash_loan_mastery {
         let instructions_sysvar = ctx.accounts.instructions_sysvar.to_account_info();
 
         // make sure this isn't a cpi call
-        let current_idx =
-            sysvar::instructions::load_current_index_checked(&instructions_sysvar)? as usize;
-        let current_ixn =
-            sysvar::instructions::load_instruction_at_checked(current_idx, &instructions_sysvar)?;
+        let current_idx = load_current_index_checked(&instructions_sysvar)? as usize;
+        let current_ixn = load_instruction_at_checked(current_idx, &instructions_sysvar)?;
         require_keys_eq!(current_ixn.program_id, crate::ID);
 
         // get expected repay amount
-        let expected_repayment = u64::try_from(
+        let fee = u64::try_from(
             u128::from(amount) * u128::from(LOAN_FEE + ADMIN_FEE)
                 / u128::from(LOAN_FEE_DENOMINATOR),
         )
         .unwrap();
+        let expected_repayment = amount.checked_add(fee).unwrap();
 
         // get the ix identifier
-        let repay_namespace = b"global:repay";
-        let mut repay_discriminator = [0u8; 8];
-        repay_discriminator.copy_from_slice(&hashv(&[repay_namespace]).to_bytes()[..8]);
-        let repay_ix_identifier = u64::from_be_bytes(repay_discriminator);
-        // let repay_ix_identifier =
-        //     u64::from_be_bytes(Repay::INSTRUCTION_HASH[..8].try_into().unwrap());
+        let borrow_ix_identifier = get_instruction_discriminator(&[b"global:borrow"]);
+        let repay_ix_identifier = get_instruction_discriminator(&[b"global:repay"]);
 
-        // loop through instructions, looking for an equivalent repay to this borrow
-        let mut ix_index = current_idx + 1;
+        let mut ix_index = current_idx;
         loop {
-            // get the next instruction, die if theres no more
-            if let Ok(ixn) =
-                sysvar::instructions::load_instruction_at_checked(ix_index, &instructions_sysvar)
-            {
-                let ixn_identifier = u64::from_be_bytes(ixn.data[..8].try_into().unwrap());
-
-                // check if we have a top level repay ix toward the same token account
-                // if so, confirm the amount, otherwise next instruction
-                if ixn.program_id == crate::ID
-                    && ixn_identifier == repay_ix_identifier
-                    && ixn.accounts[2].pubkey == ctx.accounts.token_from.key()
-                {
-                    if u64::from_le_bytes(ixn.data[8..16].try_into().unwrap()) == expected_repayment
-                    {
+            ix_index += 1;
+            if let Ok(ixn) = load_instruction_at_checked(ix_index, &instructions_sysvar) {
+                if ixn.program_id == crate::ID {
+                    let ixn_identifier = u64::from_be_bytes(ixn.data[..8].try_into().unwrap());
+                    // deal with repay instruction
+                    if ixn_identifier == repay_ix_identifier {
+                        require_keys_eq!(
+                            ixn.accounts[2].pubkey,
+                            ctx.accounts.token_from.key(),
+                            FlashLoanError::AddressMismatch
+                        );
+                        // msg!("expected_repayment {:?}", expected_repayment);
+                        let repay_ix_amount =
+                            u64::from_le_bytes(ixn.data[8..16].try_into().unwrap());
+                        // msg!("repay_ix_amount {:?}", repay_ix_amount);
+                        require_gte!(
+                            repay_ix_amount,
+                            expected_repayment,
+                            FlashLoanError::IncorrectRepaymentAmount
+                        );
+                        // ALL is good :)
                         break;
+                    } else if ixn_identifier == borrow_ix_identifier {
+                        return Err(error!(FlashLoanError::CannotBorrowBeforeRepay));
                     }
-                    return Err(error!(FlashLoanError::IncorrectRepaymentAmount));
                 }
-                ix_index += 1;
             } else {
                 return Err(error!(FlashLoanError::NoRepaymentInstructionFound));
             }
@@ -278,13 +291,11 @@ pub mod flash_loan_mastery {
         require_keys_eq!(current_ixn.program_id, crate::ID);
 
         // get admin fee
-        let admin_fee = u64::try_from(
-            u128::from(amount)
-                * (u128::from(ADMIN_FEE) / u128::from(LOAN_FEE_DENOMINATOR))
-                * u128::from(LOAN_FEE_DENOMINATOR)
-                / u128::from(LOAN_FEE_DENOMINATOR + LOAN_FEE + ADMIN_FEE),
-        )
-        .unwrap();
+        let original_amt = u128::from(LOAN_FEE_DENOMINATOR) * u128::from(amount)
+            / u128::from(LOAN_FEE_DENOMINATOR + LOAN_FEE + ADMIN_FEE);
+        let admin_fee =
+            u64::try_from(original_amt * u128::from(ADMIN_FEE) / u128::from(LOAN_FEE_DENOMINATOR))
+                .unwrap();
 
         // transfer into pool (borrowed amount + loan fee)
         anchor_spl::token::transfer(
@@ -391,7 +402,7 @@ pub struct Deposit<'info> {
     /// The token to receive tokens deposited into the pool
     #[account(
         mut,
-        constraint = token_to.owner == pool_authority.key(),
+        constraint = token_to.owner == pool_authority.key() @FlashLoanError::OwnerMismatch,
     )]
     pub token_to: Account<'info, TokenAccount>,
 
@@ -401,13 +412,13 @@ pub struct Deposit<'info> {
     pub pool_share_token_to: UncheckedAccount<'info>,
 
     /// The mint of the token representing shares in the pool
-    #[account(mut, address = pool_authority.load()?.pool_share_mint)]
+    #[account(mut, address = pool_authority.load()?.pool_share_mint @FlashLoanError::AddressMismatch)]
     pub pool_share_mint: Account<'info, Mint>,
 
     /// The pool authority
     /// CHECK: checked with seeds & constraints
     #[account(
-        address = pool_share_mint.mint_authority.unwrap(),
+        address = pool_share_mint.mint_authority.unwrap() @FlashLoanError::AddressMismatch,
         seeds = [
             POOL_SEED,
             token_to.mint.key().as_ref(),
@@ -443,13 +454,13 @@ pub struct Withdraw<'info> {
     pub pool_share_token_from: UncheckedAccount<'info>,
 
     /// The mint of the token representing shares in the pool
-    #[account(mut, address = pool_authority.load()?.pool_share_mint)]
+    #[account(mut, address = pool_authority.load()?.pool_share_mint @FlashLoanError::AddressMismatch)]
     pub pool_share_mint: Account<'info, Mint>,
 
     /// The pool authority
     /// CHECK: checked with seeds & constraints
     #[account(
-        address = pool_share_mint.mint_authority.unwrap(),
+        address = pool_share_mint.mint_authority.unwrap() @FlashLoanError::AddressMismatch,
         seeds = [
             POOL_SEED,
             token_from.mint.key().as_ref(),
@@ -492,7 +503,7 @@ pub struct Borrow<'info> {
 
     /// Solana Instructions Sysvar
     /// CHECK: Checked using address
-    #[account(address = sysvar::instructions::ID)]
+    #[account(address = sysvar::instructions::ID @FlashLoanError::AddressMismatch)]
     pub instructions_sysvar: UncheckedAccount<'info>,
 
     /// The [Token] program
@@ -515,14 +526,14 @@ pub struct Repay<'info> {
     /// The token to receive tokens repaid into the pool
     #[account(
         mut,
-        constraint = token_to.owner == pool_authority.key(),
+        constraint = token_to.owner == pool_authority.key() @FlashLoanError::OwnerMismatch,
     )]
     pub token_to: Account<'info, TokenAccount>,
 
     /// The token to receive tokens repaid into the pool
     #[account(
         mut,
-        constraint = admin_token_to.owner == ADMIN_KEY,
+        constraint = admin_token_to.owner == ADMIN_KEY @FlashLoanError::OwnerMismatch,
     )]
     pub admin_token_to: Account<'info, TokenAccount>,
 
@@ -546,18 +557,15 @@ pub struct Repay<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-impl Repay<'_> {
-    // /// Get the Anchor instruction identifier
-    // /// https://github.com/project-serum/anchor/blob/9e070870f4815849e99f19700d675638d3443b8f/lang/syn/src/codegen/program/dispatch.rs#L119
-    // ///
-    // /// Sha256("global:<rust-identifier>")[..8],
-    // const INSTRUCTION_HASH: [u8; 32] = Sha256::new().update(b"global:repay").finalize();
-    // const INSTRUCTION_HASH: [u8; 32] = hashv(&[b"global:repay"]).as_ref();
-}
-
 /// Errors for this program
 #[error_code]
 pub enum FlashLoanError {
+    #[msg("Address Mismatch")]
+    AddressMismatch,
+    #[msg("Owner Mismatch")]
+    OwnerMismatch,
+    #[msg("Cannot Borrow Before Repay")]
+    CannotBorrowBeforeRepay,
     #[msg("There is no repayment instruction")]
     NoRepaymentInstructionFound,
     #[msg("The repayment amount is incorrect")]
