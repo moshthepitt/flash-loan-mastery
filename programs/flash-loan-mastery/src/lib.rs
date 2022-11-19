@@ -9,9 +9,10 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program;
+use anchor_lang::solana_program::hash::hashv;
 use anchor_lang::solana_program::sysvar;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use sha2_const::Sha256;
+// use sha2_const::Sha256;
 use static_pubkey::static_pubkey;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
@@ -54,19 +55,13 @@ pub mod flash_loan_mastery {
     /// Deposit funds into a lending pool
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         // calculate share amount
-        // amount * total shares / total deposits
+        // amount * total shares / total pool amount
         let share_amount = if ctx.accounts.token_to.delegated_amount == 0 {
             amount
         } else {
             u64::try_from(
                 u128::from(amount) * u128::from(ctx.accounts.pool_share_mint.supply)
-                    / u128::from(
-                        ctx.accounts
-                            .token_to
-                            .delegated_amount
-                            .checked_add(amount)
-                            .unwrap(),
-                    ),
+                    / u128::from(ctx.accounts.token_to.amount),
             )
             .unwrap()
         };
@@ -210,15 +205,22 @@ pub mod flash_loan_mastery {
                 / u128::from(LOAN_FEE_DENOMINATOR),
         )
         .unwrap();
+
         // get the ix identifier
-        let repay_ix_identifier =
-            u64::from_be_bytes(Repay::INSTRUCTION_HASH[..8].try_into().unwrap());
+        let repay_namespace = b"global:repay";
+        let mut repay_discriminator = [0u8; 8];
+        repay_discriminator.copy_from_slice(&hashv(&[repay_namespace]).to_bytes()[..8]);
+        let repay_ix_identifier = u64::from_be_bytes(repay_discriminator);
+        // let repay_ix_identifier =
+        //     u64::from_be_bytes(Repay::INSTRUCTION_HASH[..8].try_into().unwrap());
 
         // loop through instructions, looking for an equivalent repay to this borrow
         let mut ix_index = current_idx + 1;
         loop {
             // get the next instruction, die if theres no more
-            if let Ok(ixn) = sysvar::instructions::load_instruction_at_checked(ix_index, &instructions_sysvar) {
+            if let Ok(ixn) =
+                sysvar::instructions::load_instruction_at_checked(ix_index, &instructions_sysvar)
+            {
                 let ixn_identifier = u64::from_be_bytes(ixn.data[..8].try_into().unwrap());
 
                 // check if we have a top level repay ix toward the same token account
@@ -230,14 +232,12 @@ pub mod flash_loan_mastery {
                     if u64::from_le_bytes(ixn.data[8..16].try_into().unwrap()) == expected_repayment
                     {
                         break;
-                    } else {
-                        return Err(error!(FlashLoanError::IncorrectRepay));
                     }
-                } else {
-                    ix_index += 1;
+                    return Err(error!(FlashLoanError::IncorrectRepaymentAmount));
                 }
+                ix_index += 1;
             } else {
-                return Err(error!(FlashLoanError::NoRepay));
+                return Err(error!(FlashLoanError::NoRepaymentInstructionFound));
             }
         }
 
@@ -547,18 +547,19 @@ pub struct Repay<'info> {
 }
 
 impl Repay<'_> {
-    /// Get the Anchor instruction identifier
-    /// https://github.com/project-serum/anchor/blob/9e070870f4815849e99f19700d675638d3443b8f/lang/syn/src/codegen/program/dispatch.rs#L119
-    ///
-    /// Sha256("global:<rust-identifier>")[..8],
-    const INSTRUCTION_HASH: [u8; 32] = Sha256::new().update(b"global:repay").finalize();
+    // /// Get the Anchor instruction identifier
+    // /// https://github.com/project-serum/anchor/blob/9e070870f4815849e99f19700d675638d3443b8f/lang/syn/src/codegen/program/dispatch.rs#L119
+    // ///
+    // /// Sha256("global:<rust-identifier>")[..8],
+    // const INSTRUCTION_HASH: [u8; 32] = Sha256::new().update(b"global:repay").finalize();
+    // const INSTRUCTION_HASH: [u8; 32] = hashv(&[b"global:repay"]).as_ref();
 }
 
 /// Errors for this program
 #[error_code]
 pub enum FlashLoanError {
     #[msg("There is no repayment instruction")]
-    NoRepay,
+    NoRepaymentInstructionFound,
     #[msg("The repayment amount is incorrect")]
-    IncorrectRepay,
+    IncorrectRepaymentAmount,
 }
