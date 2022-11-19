@@ -202,7 +202,7 @@ pub mod flash_loan_mastery {
             sysvar::instructions::load_current_index_checked(&instructions_sysvar)? as usize;
         let current_ixn =
             sysvar::instructions::load_instruction_at_checked(current_idx, &instructions_sysvar)?;
-        require_keys_eq!(current_ixn.program_id, *ctx.program_id);
+        require_keys_eq!(current_ixn.program_id, crate::ID);
 
         // get expected repay amount
         let expected_repayment = u64::try_from(
@@ -223,7 +223,7 @@ pub mod flash_loan_mastery {
 
                 // check if we have a top level repay ix toward the same token account
                 // if so, confirm the amount, otherwise next instruction
-                if ixn.program_id == *ctx.program_id
+                if ixn.program_id == crate::ID
                     && ixn_identifier == repay_ix_identifier
                     && ixn.accounts[2].pubkey == ctx.accounts.token_from.key()
                 {
@@ -275,7 +275,7 @@ pub mod flash_loan_mastery {
             sysvar::instructions::load_current_index_checked(&instructions_sysvar)? as usize;
         let current_ixn =
             sysvar::instructions::load_instruction_at_checked(current_idx, &instructions_sysvar)?;
-        require_keys_eq!(current_ixn.program_id, *ctx.program_id);
+        require_keys_eq!(current_ixn.program_id, crate::ID);
 
         // get admin fee
         let admin_fee = u64::try_from(
@@ -347,7 +347,7 @@ pub struct InitPool<'info> {
     /// The mint of the token that will represent shares in a given pool
     #[account(
         mut,
-        constraint = pool_share_mint.decimals == 0,
+        constraint = pool_share_mint.decimals == mint.decimals,
         constraint = pool_share_mint.supply == 0,
     )]
     pub pool_share_mint: Account<'info, Mint>,
