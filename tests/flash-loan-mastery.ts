@@ -207,7 +207,7 @@ describe("flash-loan-mastery", () => {
       poolMint.publicKey,
       "processed"
     );
-    expect(tokenToAccAfter.delegatedAmount).equals(BigInt(amount1.toString()));
+    expect(tokenToAccAfter.amount).equals(BigInt(amount1.toString()));
     expect(poolShareTokenToAccAfter.amount).equals(BigInt(amount1.toString()));
     expect(poolShareMintAccAfter.supply).equals(BigInt(amount1.toString()));
     // 100% of pool shares
@@ -249,7 +249,7 @@ describe("flash-loan-mastery", () => {
       poolMint.publicKey,
       "processed"
     );
-    expect(tokenToAccAfter2.delegatedAmount).equals(
+    expect(tokenToAccAfter2.amount).equals(
       BigInt(amount1.toString()) + BigInt(amount2.toString())
     );
     // 50% of pool shares
@@ -402,9 +402,6 @@ describe("flash-loan-mastery", () => {
     expect(tokenFromAfter.amount).equals(
       tokenFromBefore.amount - BigInt(tokenValue)
     );
-    expect(tokenFromAfter.delegatedAmount).equals(
-      tokenFromBefore.delegatedAmount - BigInt(amount1.toString())
-    );
     expect(tokenToAfter.amount).equals(
       tokenToBefore.amount + BigInt(tokenValue)
     );
@@ -453,10 +450,7 @@ describe("flash-loan-mastery", () => {
       adminKey,
       tokenMint.publicKey
     );
-    // console.log('lenderFromBefore.amount', lenderFromBefore.amount);
-    // console.log('lenderFromBefore.delegatedAmount', lenderFromBefore.delegatedAmount);
-    // const amount1 = new BN(Number(lenderFromBefore.amount));
-    const amount1 = new BN(100_777);
+    const amount1 = new BN(Number(lenderFromBefore.amount));
     const borrowIx = await program.methods
       .borrow(amount1)
       .accountsStrict({
@@ -485,12 +479,12 @@ describe("flash-loan-mastery", () => {
       })
       .instruction();
 
-    const txid = await program.provider.sendAndConfirm(
+    await program.provider.sendAndConfirm(
       new anchor.web3.Transaction().add(
         ...[createDepositor2TokenIx, borrowIx, createAdminTokenIx, repayIx]
       )
     );
-    console.log(txid);
+
     let lenderFromAfter = await getAccount(
       program.provider.connection,
       lenderFrom,
@@ -517,26 +511,6 @@ describe("flash-loan-mastery", () => {
     );
     expect(borrowerToAfter.amount).equals(BigInt(amount1.toNumber()));
     expect(adminTokenToAfter.amount).equals(BigInt(adminFee.toNumber()));
-    console.log("lenderFromBefore.amount", lenderFromBefore.amount);
-    console.log("lenderFromAfter.amount", lenderFromAfter.amount);
-    console.log("difference", lenderFromAfter.amount - lenderFromBefore.amount);
-    console.log("totalFees", totalFees.toNumber());
-    console.log("repaymentAmount", repaymentAmount.toNumber());
-    console.log("adminFee", adminFee.toNumber());
-    console.log(
-      "wtf",
-      new BN(lenderFromBefore.amount.toString())
-        .add(totalFees)
-        .sub(adminFee)
-        .toNumber()
-    );
-    console.log(
-      "allllll",
-      new BN(lenderFromBefore.amount.toString())
-        .add(repaymentAmount)
-        .sub(adminFee)
-        .toNumber()
-    );
     expect(Number(lenderFromAfter.amount)).equals(
       new BN(lenderFromBefore.amount.toString())
         .add(totalFees)

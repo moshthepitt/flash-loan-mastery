@@ -68,7 +68,7 @@ pub mod flash_loan_mastery {
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         // calculate share amount
         // amount * total shares / total pool amount
-        let share_amount = if ctx.accounts.token_to.delegated_amount == 0 {
+        let share_amount = if ctx.accounts.token_to.amount == 0 {
             amount
         } else {
             u64::try_from(
@@ -98,24 +98,6 @@ pub mod flash_loan_mastery {
             mint_bytes.as_ref(),
             &[ctx.accounts.pool_authority.load()?.bump],
         ];
-
-        // set `delegated_amount` (keeps track of total deposit amount)
-        anchor_spl::token::approve(
-            CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                anchor_spl::token::Approve {
-                    to: ctx.accounts.token_to.to_account_info(),
-                    delegate: ctx.accounts.pool_authority.to_account_info(),
-                    authority: ctx.accounts.pool_authority.to_account_info(),
-                },
-            )
-            .with_signer(&[&pool_authority_seeds[..]]),
-            ctx.accounts
-                .token_to
-                .delegated_amount
-                .checked_add(amount)
-                .unwrap(),
-        )?;
 
         // mint new pool share tokens
         anchor_spl::token::mint_to(
@@ -177,24 +159,6 @@ pub mod flash_loan_mastery {
             )
             .with_signer(&[&pool_authority_seeds[..]]),
             token_amount,
-        )?;
-
-        // set `delegated_amount` (keeps track of total deposit amount)
-        anchor_spl::token::approve(
-            CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                anchor_spl::token::Approve {
-                    to: ctx.accounts.token_from.to_account_info(),
-                    delegate: ctx.accounts.pool_authority.to_account_info(),
-                    authority: ctx.accounts.pool_authority.to_account_info(),
-                },
-            )
-            .with_signer(&[&pool_authority_seeds[..]]),
-            ctx.accounts
-                .token_from
-                .delegated_amount
-                .checked_sub(amount)
-                .unwrap(),
         )?;
 
         Ok(())
