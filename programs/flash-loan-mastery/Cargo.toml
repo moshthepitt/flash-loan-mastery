@@ -20,4 +20,4 @@ anchor-lang = "0.25.0"
 anchor-spl = "0.25.0"
 spl-token = { version = "3.1.1", features = ["no-entrypoint"] }
 static-pubkey = "1.0.3"
-sha2-const = "0.1.2"
+# sha2-const = "0.1.2"
