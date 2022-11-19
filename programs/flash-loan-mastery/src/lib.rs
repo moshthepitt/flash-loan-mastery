@@ -15,7 +15,6 @@ use anchor_lang::solana_program::sysvar::instructions::{
     load_current_index_checked, load_instruction_at_checked,
 };
 use anchor_spl::token::{Mint, Token, TokenAccount};
-// use sha2_const::Sha256;
 use static_pubkey::static_pubkey;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
