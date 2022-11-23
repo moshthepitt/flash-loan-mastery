@@ -38,7 +38,7 @@ pub static LOAN_FEE_DENOMINATOR: u128 = 10000;
 pub static ONE_HUNDRED: u128 = 100;
 
 pub static POOL_SEED: &[u8] = b"flash_loan";
-pub static ADMIN_KEY: Pubkey = static_pubkey!("44fVncfVm5fB8VsRBwVZW75FdR1nSVUKcf9nUa4ky6qN");
+pub static ADMIN_KEY: Pubkey = static_pubkey!("8JJxe21mwJezmU5y9NxTWUxc9stkEkwcP1deRzL2Kc7s");
 
 #[must_use]
 /// Get the Anchor instruction identifier
