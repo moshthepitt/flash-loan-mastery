@@ -17,6 +17,17 @@ use anchor_lang::solana_program::sysvar::instructions::{
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use spl_associated_token_account::get_associated_token_address;
 use static_pubkey::static_pubkey;
+use solana_security_txt::security_txt;
+
+#[cfg(not(feature = "no-entrypoint"))]
+security_txt! {
+    name: "Flash Loan Mastery",
+    project_url: "https://github.com/moshthepitt/flash-loan-mastery",
+    contacts: "link:https://twitter.com/moshthepitt",
+    policy: "https://github.com/solana-labs/solana/blob/master/SECURITY.md",
+    preferred_languages: "en",
+    source_code: "https://github.com/moshthepitt/flash-loan-mastery"
+}
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 

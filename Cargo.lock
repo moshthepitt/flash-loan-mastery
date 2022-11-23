@@ -553,6 +553,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "solana-security-txt",
  "spl-associated-token-account",
  "spl-token",
  "static-pubkey",
@@ -1253,6 +1254,12 @@ dependencies = [
  "rustversion",
  "syn",
 ]
+
+[[package]]
+name = "solana-security-txt"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73e93d99928eeb25c103033a015667a93ac49c243852270c01a3ea1d61341ab8"
 
 [[package]]
 name = "spl-associated-token-account"
