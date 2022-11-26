@@ -1,7 +1,6 @@
 [package]
 name = "flash-loan-mastery"
 version = "0.1.0"
-author = "Kelvin Jayanoris"
 description = "Simple and best flash loan program :)"
 edition = "2021"
 
