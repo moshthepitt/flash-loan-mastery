@@ -33,7 +33,7 @@ describe("flash-loan-mastery", () => {
   const depositor3 = new Keypair();
   let poolAuthorityKey: PublicKey;
   const adminKey = new PublicKey(
-    "44fVncfVm5fB8VsRBwVZW75FdR1nSVUKcf9nUa4ky6qN"
+    "8JJxe21mwJezmU5y9NxTWUxc9stkEkwcP1deRzL2Kc7s"
   );
 
   it("init pool", async () => {
@@ -424,7 +424,8 @@ describe("flash-loan-mastery", () => {
     );
     const adminTokenTo = await getAssociatedTokenAddress(
       tokenMint.publicKey,
-      adminKey
+      adminKey,
+      true
     );
 
     let lenderFromBefore = await getAccount(
@@ -464,7 +465,11 @@ describe("flash-loan-mastery", () => {
       .instruction();
 
     const totalFees = amount1
-      .mul(new BN(950))
+      .mul(new BN(900).add(new BN(50).mul(new BN(2))))
+      .div(new BN(10000))
+      .div(new BN(100));
+    const feesWithNoReferral = amount1
+      .mul(new BN(900).add(new BN(50)))
       .div(new BN(10000))
       .div(new BN(100));
     const adminFee = amount1
@@ -472,6 +477,7 @@ describe("flash-loan-mastery", () => {
       .div(new BN(10000))
       .div(new BN(100));
     const repaymentAmount = amount1.add(totalFees);
+    const repaymentAmountNoReferral = amount1.add(feesWithNoReferral);
     const repayIx = await program.methods
       .repay(repaymentAmount)
       .accountsStrict({
@@ -512,17 +518,87 @@ describe("flash-loan-mastery", () => {
       "processed"
     );
 
-    expect(repayerFromAfter.amount).equals(
-      repayerFromBefore.amount - BigInt(repaymentAmount.toNumber())
-    );
     expect(borrowerToAfter.amount).equals(BigInt(amount1.toNumber()));
     expect(adminTokenToAfter.amount).equals(BigInt(adminFee.toNumber()));
+    expect(Number(lenderFromAfter.amount)).gt(Number(lenderFromBefore.amount));
     expect(Number(lenderFromAfter.amount)).equals(
       new BN(lenderFromBefore.amount.toString())
-        .add(totalFees)
+        .add(feesWithNoReferral)
         .sub(adminFee)
         .toNumber()
     );
+    expect(repayerFromAfter.amount).equals(
+      repayerFromBefore.amount - BigInt(repaymentAmountNoReferral.toNumber())
+    ) /** no referral fees charged */;
+
+    // inclusion of referral fee works
+    const referralTokenTo = await getAssociatedTokenAddress(
+      tokenMint.publicKey,
+      depositor3.publicKey,
+      true
+    );
+    const createReferralTokenIx = createAssociatedTokenAccountInstruction(
+      wallet,
+      referralTokenTo,
+      depositor3.publicKey,
+      tokenMint.publicKey
+    );
+    const repayWithReferralIx = await program.methods
+      .repay(repaymentAmount)
+      .accountsStrict({
+        repayer: wallet,
+        tokenFrom: repayerFrom,
+        tokenTo: lenderFrom,
+        adminTokenTo,
+        poolAuthority: poolAuthorityKey,
+        instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .remainingAccounts([
+        { pubkey: referralTokenTo, isSigner: false, isWritable: true },
+      ])
+      .instruction();
+    await program.provider.sendAndConfirm(
+      new anchor.web3.Transaction().add(
+        ...[createReferralTokenIx, borrowIx, repayWithReferralIx]
+      )
+    );
+    let adminTokenToAfter2 = await getAccount(
+      program.provider.connection,
+      adminTokenTo,
+      "processed"
+    );
+    let lenderFromAfter2 = await getAccount(
+      program.provider.connection,
+      lenderFrom,
+      "processed"
+    );
+    let repayerFromAfter2 = await getAccount(
+      program.provider.connection,
+      repayerFrom,
+      "processed"
+    );
+    let referralTokenToAfter = await getAccount(
+      program.provider.connection,
+      referralTokenTo,
+      "processed"
+    );
+    expect(adminTokenToAfter2.amount).equals(
+      adminTokenToAfter.amount + BigInt(adminFee.toNumber())
+    ) /** admin gets another payment */;
+    expect(referralTokenToAfter.amount).equals(
+      BigInt(adminFee.toNumber())
+    ) /** referral fee paid */;
+    expect(Number(lenderFromAfter2.amount)).gt(Number(lenderFromAfter.amount));
+    expect(Number(lenderFromAfter2.amount)).equals(
+      new BN(lenderFromAfter.amount.toString())
+        .add(feesWithNoReferral)
+        .sub(adminFee)
+        .toNumber()
+    ) /** no change in expected payment amount */;
+    expect(repayerFromAfter2.amount).equals(
+      repayerFromAfter.amount - BigInt(repaymentAmount.toNumber())
+    ) /** referral fees have been charged */;
 
     // wrong repayment fails
     let success1 = true;
