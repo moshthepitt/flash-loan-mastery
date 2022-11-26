@@ -15,9 +15,9 @@ use anchor_lang::solana_program::sysvar::instructions::{
     load_current_index_checked, load_instruction_at_checked,
 };
 use anchor_spl::token::{Mint, Token, TokenAccount};
+use solana_security_txt::security_txt;
 use spl_associated_token_account::get_associated_token_address;
 use static_pubkey::static_pubkey;
-use solana_security_txt::security_txt;
 
 #[cfg(not(feature = "no-entrypoint"))]
 security_txt! {
@@ -31,7 +31,7 @@ security_txt! {
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
-// with these numbers total loan fee is 0.095%
+// with these numbers total loan fee is 0.095% or 0.1% if there is a referral
 pub static LOAN_FEE: u128 = 900;
 pub static ADMIN_FEE: u128 = 50;
 pub static LOAN_FEE_DENOMINATOR: u128 = 10000;
@@ -193,7 +193,7 @@ pub mod flash_loan_mastery {
 
         // get expected repay amount
         let fee = u64::try_from(
-            u128::from(amount) * (LOAN_FEE + ADMIN_FEE) / (LOAN_FEE_DENOMINATOR * ONE_HUNDRED),
+            u128::from(amount) * (LOAN_FEE + ADMIN_FEE * 2) / (LOAN_FEE_DENOMINATOR * ONE_HUNDRED),
         )
         .unwrap();
         let expected_repayment = amount.checked_add(fee).unwrap();
@@ -264,7 +264,7 @@ pub mod flash_loan_mastery {
     }
 
     /// Repay funds to a lending pool
-    pub fn repay(ctx: Context<Repay>, amount: u64) -> Result<()> {
+    pub fn repay<'info>(ctx: Context<'_, '_, '_, 'info, Repay<'info>>, amount: u64) -> Result<()> {
         let instructions_sysvar = ctx.accounts.instructions_sysvar.to_account_info();
 
         // make sure this isn't a cpi call
@@ -280,9 +280,18 @@ pub mod flash_loan_mastery {
 
         // get admin fee
         let original_amt = LOAN_FEE_DENOMINATOR * ONE_HUNDRED * u128::from(amount)
-            / ((LOAN_FEE_DENOMINATOR * ONE_HUNDRED) + LOAN_FEE + ADMIN_FEE);
+            / ((LOAN_FEE_DENOMINATOR * ONE_HUNDRED) + LOAN_FEE + ADMIN_FEE * 2);
         let admin_fee =
             u64::try_from(original_amt * ADMIN_FEE / (LOAN_FEE_DENOMINATOR * ONE_HUNDRED)).unwrap();
+
+        // should we pay a referral fee?
+        let mut pay_referral_fee = false;
+        if let Some(referral_info) = ctx.remaining_accounts.get(0) {
+            let referral_token_info = Account::<TokenAccount>::try_from(referral_info);
+            if referral_token_info.is_ok() {
+                pay_referral_fee = true;
+            }
+        }
 
         // transfer into pool (borrowed amount + loan fee)
         anchor_spl::token::transfer(
@@ -294,7 +303,7 @@ pub mod flash_loan_mastery {
                     authority: ctx.accounts.repayer.to_account_info(),
                 },
             ),
-            amount.checked_sub(admin_fee).unwrap(),
+            amount.checked_sub(admin_fee.checked_mul(2).unwrap()).unwrap(),
         )?;
         // transfer to admin (just admin fee)
         anchor_spl::token::transfer(
@@ -308,6 +317,20 @@ pub mod flash_loan_mastery {
             ),
             admin_fee,
         )?;
+        // transfer referral fee (equivalent to admin fee)
+        if pay_referral_fee {
+            anchor_spl::token::transfer(
+                CpiContext::new(
+                    ctx.accounts.token_program.to_account_info(),
+                    anchor_spl::token::Transfer {
+                        from: ctx.accounts.token_from.to_account_info(),
+                        to: ctx.remaining_accounts.get(0).unwrap().to_account_info(),
+                        authority: ctx.accounts.repayer.to_account_info(),
+                    },
+                ),
+                admin_fee,
+            )?;
+        }
 
         Ok(())
     }
