@@ -87,6 +87,13 @@ describe("flash-loan-mastery", () => {
     expect(poolAuthorityAccount.poolShareMint.equals(poolMint.publicKey)).to.be
       .true;
     expect(poolAuthorityAccount.mint.equals(tokenMint.publicKey)).to.be.true;
+
+    const poolShareMintAcc = await getMint(
+      program.provider.connection,
+      poolMint.publicKey
+    );
+    expect(poolShareMintAcc.mintAuthority.equals(poolAuthority[0])).to.be.true;
+    expect(poolShareMintAcc.freezeAuthority).to.be.null;
   });
 
   it("deposit into pool", async () => {

@@ -75,6 +75,20 @@ pub mod flash_loan_mastery {
             Some(ctx.accounts.pool_authority.key()),
         )?;
 
+        if ctx.accounts.pool_share_mint.freeze_authority.is_some() {
+            anchor_spl::token::set_authority(
+                CpiContext::new(
+                    ctx.accounts.token_program.to_account_info(),
+                    anchor_spl::token::SetAuthority {
+                        current_authority: ctx.accounts.pool_share_mint_authority.to_account_info(),
+                        account_or_mint: ctx.accounts.pool_share_mint.to_account_info(),
+                    },
+                ),
+                spl_token::instruction::AuthorityType::FreezeAccount,
+                Option::None,
+            )?;
+        }
+
         Ok(())
     }
 
