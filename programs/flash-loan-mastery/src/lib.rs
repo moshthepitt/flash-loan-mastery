@@ -27,7 +27,7 @@ security_txt! {
     source_code: "https://github.com/moshthepitt/flash-loan-mastery"
 }
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("1oanfPPN8r1i4UbugXHDxWMbWVJ5qLSN5qzNFZkz6Fg");
 
 // with these numbers total loan fee is 0.095% or 0.1% if there is a referral
 pub static LOAN_FEE: u128 = 900;
