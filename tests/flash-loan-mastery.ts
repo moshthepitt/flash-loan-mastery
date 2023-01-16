@@ -20,6 +20,11 @@ import {
 import { FlashLoanMastery } from "../target/types/flash_loan_mastery";
 import { expect } from "chai";
 
+export const LOAN_FEE = 900;
+export const REFERRAL_FEE = 50;
+export const LOAN_FEE_DENOMINATOR = 10000;
+export const ONE_HUNDRED = 100;
+
 describe("flash-loan-mastery", () => {
   // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.env());
@@ -32,9 +37,6 @@ describe("flash-loan-mastery", () => {
   const depositor2 = new Keypair();
   const depositor3 = new Keypair();
   let poolAuthorityKey: PublicKey;
-  const adminKey = new PublicKey(
-    "8JJxe21mwJezmU5y9NxTWUxc9stkEkwcP1deRzL2Kc7s"
-  );
 
   it("init pool", async () => {
     // set up the mint and token accounts
@@ -429,11 +431,6 @@ describe("flash-loan-mastery", () => {
       wallet,
       true
     );
-    const adminTokenTo = await getAssociatedTokenAddress(
-      tokenMint.publicKey,
-      adminKey,
-      true
-    );
 
     let lenderFromBefore = await getAccount(
       program.provider.connection,
@@ -452,13 +449,7 @@ describe("flash-loan-mastery", () => {
       depositor2.publicKey,
       tokenMint.publicKey
     );
-    const createAdminTokenIx = createAssociatedTokenAccountInstruction(
-      wallet,
-      adminTokenTo,
-      adminKey,
-      tokenMint.publicKey
-    );
-    const amount1 = new BN(Number(lenderFromBefore.amount));
+    const amount1 = new BN(Number(400_000));
     const borrowIx = await program.methods
       .borrow(amount1)
       .accountsStrict({
@@ -471,27 +462,26 @@ describe("flash-loan-mastery", () => {
       })
       .instruction();
 
+    const loanFees = amount1
+      .mul(new BN(LOAN_FEE))
+      .div(new BN(LOAN_FEE_DENOMINATOR))
+      .div(new BN(ONE_HUNDRED));
+    const referralFee = amount1
+      .mul(new BN(REFERRAL_FEE))
+      .div(new BN(LOAN_FEE_DENOMINATOR))
+      .div(new BN(ONE_HUNDRED));
     const totalFees = amount1
-      .mul(new BN(900).add(new BN(50).mul(new BN(2))))
-      .div(new BN(10000))
-      .div(new BN(100));
-    const feesWithNoReferral = amount1
-      .mul(new BN(900).add(new BN(50)))
-      .div(new BN(10000))
-      .div(new BN(100));
-    const adminFee = amount1
-      .mul(new BN(50))
-      .div(new BN(10000))
-      .div(new BN(100));
+      .mul(new BN(LOAN_FEE + REFERRAL_FEE))
+      .div(new BN(LOAN_FEE_DENOMINATOR))
+      .div(new BN(ONE_HUNDRED));
     const repaymentAmount = amount1.add(totalFees);
-    const repaymentAmountNoReferral = amount1.add(feesWithNoReferral);
+    const repaymentAmountNoReferral = amount1.add(loanFees);
     const repayIx = await program.methods
       .repay(repaymentAmount)
       .accountsStrict({
         repayer: wallet,
         tokenFrom: repayerFrom,
         tokenTo: lenderFrom,
-        adminTokenTo,
         poolAuthority: poolAuthorityKey,
         instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -500,7 +490,7 @@ describe("flash-loan-mastery", () => {
 
     await program.provider.sendAndConfirm(
       new anchor.web3.Transaction().add(
-        ...[createDepositor2TokenIx, borrowIx, createAdminTokenIx, repayIx]
+        ...[createDepositor2TokenIx, borrowIx, repayIx]
       )
     );
 
@@ -519,20 +509,11 @@ describe("flash-loan-mastery", () => {
       repayerFrom,
       "processed"
     );
-    let adminTokenToAfter = await getAccount(
-      program.provider.connection,
-      adminTokenTo,
-      "processed"
-    );
 
     expect(borrowerToAfter.amount).equals(BigInt(amount1.toNumber()));
-    expect(adminTokenToAfter.amount).equals(BigInt(adminFee.toNumber()));
     expect(Number(lenderFromAfter.amount)).gt(Number(lenderFromBefore.amount));
     expect(Number(lenderFromAfter.amount)).equals(
-      new BN(lenderFromBefore.amount.toString())
-        .add(feesWithNoReferral)
-        .sub(adminFee)
-        .toNumber()
+      new BN(lenderFromBefore.amount.toString()).add(loanFees).toNumber()
     );
     expect(repayerFromAfter.amount).equals(
       repayerFromBefore.amount - BigInt(repaymentAmountNoReferral.toNumber())
@@ -556,7 +537,6 @@ describe("flash-loan-mastery", () => {
         repayer: wallet,
         tokenFrom: repayerFrom,
         tokenTo: lenderFrom,
-        adminTokenTo,
         poolAuthority: poolAuthorityKey,
         instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -569,11 +549,6 @@ describe("flash-loan-mastery", () => {
       new anchor.web3.Transaction().add(
         ...[createReferralTokenIx, borrowIx, repayWithReferralIx]
       )
-    );
-    let adminTokenToAfter2 = await getAccount(
-      program.provider.connection,
-      adminTokenTo,
-      "processed"
     );
     let lenderFromAfter2 = await getAccount(
       program.provider.connection,
@@ -590,47 +565,127 @@ describe("flash-loan-mastery", () => {
       referralTokenTo,
       "processed"
     );
-    expect(adminTokenToAfter2.amount).equals(
-      adminTokenToAfter.amount + BigInt(adminFee.toNumber())
-    ) /** admin gets another payment */;
     expect(referralTokenToAfter.amount).equals(
-      BigInt(adminFee.toNumber())
+      BigInt(referralFee.toNumber())
     ) /** referral fee paid */;
     expect(Number(lenderFromAfter2.amount)).gt(Number(lenderFromAfter.amount));
     expect(Number(lenderFromAfter2.amount)).equals(
       new BN(lenderFromAfter.amount.toString())
-        .add(feesWithNoReferral)
-        .sub(adminFee)
+        .add(loanFees)
         .toNumber()
     ) /** no change in expected payment amount */;
     expect(repayerFromAfter2.amount).equals(
       repayerFromAfter.amount - BigInt(repaymentAmount.toNumber())
     ) /** referral fees have been charged */;
 
-    // wrong repayment fails
-    let success1 = true;
-    try {
+      // wrong repayment fails
+      let success1 = true;
+      try {
+        await program.provider.sendAndConfirm(
+          new anchor.web3.Transaction().add(
+            ...[
+              await program.methods
+                .borrow(new BN(100_000))
+                .accountsStrict({
+                  borrower: wallet,
+                  tokenFrom: lenderFrom,
+                  tokenTo: borrowerTo,
+                  poolAuthority: poolAuthorityKey,
+                  instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+                  tokenProgram: TOKEN_PROGRAM_ID,
+                })
+                .instruction(),
+              await program.methods
+                .repay(new BN(90_000))
+                .accountsStrict({
+                  repayer: wallet,
+                  tokenFrom: repayerFrom,
+                  tokenTo: lenderFrom,
+                  poolAuthority: poolAuthorityKey,
+                  instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+                  tokenProgram: TOKEN_PROGRAM_ID,
+                })
+                .instruction(),
+            ]
+          )
+        );
+      } catch {
+        success1 = false;
+      }
+      expect(success1).to.be.false;
+
+      // no repayment fails
+      let success2 = true;
+      try {
+        await program.provider.sendAndConfirm(
+          new anchor.web3.Transaction().add(
+            ...[
+              await program.methods
+                .borrow(new BN(100_000))
+                .accountsStrict({
+                  borrower: wallet,
+                  tokenFrom: lenderFrom,
+                  tokenTo: borrowerTo,
+                  poolAuthority: poolAuthorityKey,
+                  instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+                  tokenProgram: TOKEN_PROGRAM_ID,
+                })
+                .instruction(),
+              createTransferInstruction(repayerFrom, lenderFrom, wallet, 1337),
+            ]
+          )
+        );
+      } catch {
+        success2 = false;
+      }
+      expect(success2).to.be.false;
+
+      // wrong repayment token account fails
+      let success3 = true;
+      try {
+        await program.provider.sendAndConfirm(
+          new anchor.web3.Transaction().add(
+            ...[
+              await program.methods
+                .borrow(new BN(100_000))
+                .accountsStrict({
+                  borrower: wallet,
+                  tokenFrom: lenderFrom,
+                  tokenTo: borrowerTo,
+                  poolAuthority: poolAuthorityKey,
+                  instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+                  tokenProgram: TOKEN_PROGRAM_ID,
+                })
+                .instruction(),
+              await program.methods
+                .repay(new BN(90_000))
+                .accountsStrict({
+                  repayer: wallet,
+                  tokenFrom: repayerFrom,
+                  tokenTo: borrowerTo /** this is wrong */,
+                  poolAuthority: poolAuthorityKey,
+                  instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+                  tokenProgram: TOKEN_PROGRAM_ID,
+                })
+                .instruction(),
+            ]
+          )
+        );
+      } catch {
+        success3 = false;
+      }
+      expect(success3).to.be.false;
+
+      // repayment with no borrow works
       await program.provider.sendAndConfirm(
         new anchor.web3.Transaction().add(
           ...[
-            await program.methods
-              .borrow(new BN(100_000))
-              .accountsStrict({
-                borrower: wallet,
-                tokenFrom: lenderFrom,
-                tokenTo: borrowerTo,
-                poolAuthority: poolAuthorityKey,
-                instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
-                tokenProgram: TOKEN_PROGRAM_ID,
-              })
-              .instruction(),
             await program.methods
               .repay(new BN(90_000))
               .accountsStrict({
                 repayer: wallet,
                 tokenFrom: repayerFrom,
                 tokenTo: lenderFrom,
-                adminTokenTo,
                 poolAuthority: poolAuthorityKey,
                 instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
                 tokenProgram: TOKEN_PROGRAM_ID,
@@ -639,140 +694,52 @@ describe("flash-loan-mastery", () => {
           ]
         )
       );
-    } catch {
-      success1 = false;
-    }
-    expect(success1).to.be.false;
 
-    // no repayment fails
-    let success2 = true;
-    try {
-      await program.provider.sendAndConfirm(
-        new anchor.web3.Transaction().add(
-          ...[
-            await program.methods
-              .borrow(new BN(100_000))
-              .accountsStrict({
-                borrower: wallet,
-                tokenFrom: lenderFrom,
-                tokenTo: borrowerTo,
-                poolAuthority: poolAuthorityKey,
-                instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
-                tokenProgram: TOKEN_PROGRAM_ID,
-              })
-              .instruction(),
-            createTransferInstruction(repayerFrom, lenderFrom, wallet, 1337),
-          ]
-        )
-      );
-    } catch {
-      success2 = false;
-    }
-    expect(success2).to.be.false;
-
-    // wrong repayment token account fails
-    let success3 = true;
-    try {
-      await program.provider.sendAndConfirm(
-        new anchor.web3.Transaction().add(
-          ...[
-            await program.methods
-              .borrow(new BN(100_000))
-              .accountsStrict({
-                borrower: wallet,
-                tokenFrom: lenderFrom,
-                tokenTo: borrowerTo,
-                poolAuthority: poolAuthorityKey,
-                instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
-                tokenProgram: TOKEN_PROGRAM_ID,
-              })
-              .instruction(),
-            await program.methods
-              .repay(new BN(90_000))
-              .accountsStrict({
-                repayer: wallet,
-                tokenFrom: repayerFrom,
-                tokenTo: borrowerTo /** this is wrong */,
-                adminTokenTo,
-                poolAuthority: poolAuthorityKey,
-                instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
-                tokenProgram: TOKEN_PROGRAM_ID,
-              })
-              .instruction(),
-          ]
-        )
-      );
-    } catch {
-      success3 = false;
-    }
-    expect(success3).to.be.false;
-
-    // repayment with no borrow works
-    await program.provider.sendAndConfirm(
-      new anchor.web3.Transaction().add(
-        ...[
-          await program.methods
-            .repay(new BN(90_000))
-            .accountsStrict({
-              repayer: wallet,
-              tokenFrom: repayerFrom,
-              tokenTo: lenderFrom,
-              adminTokenTo,
-              poolAuthority: poolAuthorityKey,
-              instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
-              tokenProgram: TOKEN_PROGRAM_ID,
-            })
-            .instruction(),
-        ]
-      )
-    );
-
-    // re-borrow before repaying fails
-    let success4 = true;
-    try {
-      await program.provider.sendAndConfirm(
-        new anchor.web3.Transaction().add(
-          ...[
-            await program.methods
-              .borrow(amount1)
-              .accountsStrict({
-                borrower: wallet,
-                tokenFrom: lenderFrom,
-                tokenTo: borrowerTo,
-                poolAuthority: poolAuthorityKey,
-                instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
-                tokenProgram: TOKEN_PROGRAM_ID,
-              })
-              .instruction(),
-            await program.methods
-              .borrow(new BN(10))
-              .accountsStrict({
-                borrower: wallet,
-                tokenFrom: lenderFrom,
-                tokenTo: borrowerTo,
-                poolAuthority: poolAuthorityKey,
-                instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
-                tokenProgram: TOKEN_PROGRAM_ID,
-              })
-              .instruction() /** borrow again */,
-            await program.methods
-              .repay(repaymentAmount)
-              .accountsStrict({
-                repayer: wallet,
-                tokenFrom: repayerFrom,
-                tokenTo: lenderFrom,
-                adminTokenTo,
-                poolAuthority: poolAuthorityKey,
-                instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
-                tokenProgram: TOKEN_PROGRAM_ID,
-              })
-              .instruction(),
-          ]
-        )
-      );
-    } catch {
-      success4 = false;
-    }
-    expect(success4).to.be.false;
+      // re-borrow before repaying fails
+      let success4 = true;
+      try {
+        await program.provider.sendAndConfirm(
+          new anchor.web3.Transaction().add(
+            ...[
+              await program.methods
+                .borrow(amount1)
+                .accountsStrict({
+                  borrower: wallet,
+                  tokenFrom: lenderFrom,
+                  tokenTo: borrowerTo,
+                  poolAuthority: poolAuthorityKey,
+                  instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+                  tokenProgram: TOKEN_PROGRAM_ID,
+                })
+                .instruction(),
+              await program.methods
+                .borrow(new BN(10))
+                .accountsStrict({
+                  borrower: wallet,
+                  tokenFrom: lenderFrom,
+                  tokenTo: borrowerTo,
+                  poolAuthority: poolAuthorityKey,
+                  instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+                  tokenProgram: TOKEN_PROGRAM_ID,
+                })
+                .instruction() /** borrow again */,
+              await program.methods
+                .repay(repaymentAmount)
+                .accountsStrict({
+                  repayer: wallet,
+                  tokenFrom: repayerFrom,
+                  tokenTo: lenderFrom,
+                  poolAuthority: poolAuthorityKey,
+                  instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+                  tokenProgram: TOKEN_PROGRAM_ID,
+                })
+                .instruction(),
+            ]
+          )
+        );
+      } catch {
+        success4 = false;
+      }
+      expect(success4).to.be.false;
   });
 });

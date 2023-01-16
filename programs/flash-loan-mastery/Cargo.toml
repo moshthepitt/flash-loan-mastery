@@ -20,5 +20,4 @@ anchor-lang = "0.25.0"
 anchor-spl = "0.25.0"
 spl-token = { version = "3.1.1", features = ["no-entrypoint"] }
 spl-associated-token-account = {version = "1.0.5", features = ["no-entrypoint"]}
-static-pubkey = "1.0.3"
 solana-security-txt = "1.0.2"

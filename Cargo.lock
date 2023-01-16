@@ -556,7 +556,6 @@ dependencies = [
  "solana-security-txt",
  "spl-associated-token-account",
  "spl-token",
- "static-pubkey",
 ]
 
 [[package]]
@@ -1285,18 +1284,6 @@ dependencies = [
  "num_enum",
  "solana-program",
  "thiserror",
-]
-
-[[package]]
-name = "static-pubkey"
-version = "1.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0547d5945c93f55e1b18bf2a67d1a3d0548561f2687645b22c1c1d4fbb9a8e90"
-dependencies = [
- "bs58 0.4.0",
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]

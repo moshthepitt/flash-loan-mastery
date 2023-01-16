@@ -8,7 +8,6 @@
 //! Simple and best flash loan program :)
 
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program;
 use anchor_lang::solana_program::hash::hashv;
 use anchor_lang::solana_program::sysvar;
 use anchor_lang::solana_program::sysvar::instructions::{
@@ -17,14 +16,13 @@ use anchor_lang::solana_program::sysvar::instructions::{
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use solana_security_txt::security_txt;
 use spl_associated_token_account::get_associated_token_address;
-use static_pubkey::static_pubkey;
 
 #[cfg(not(feature = "no-entrypoint"))]
 security_txt! {
     name: "Flash Loan Mastery",
     project_url: "https://github.com/moshthepitt/flash-loan-mastery",
     contacts: "link:https://twitter.com/moshthepitt",
-    policy: "https://github.com/solana-labs/solana/blob/master/SECURITY.md",
+    policy: "https://github.com/moshthepitt/flash-loan-mastery/blob/master/SECURITY.md",
     preferred_languages: "en",
     source_code: "https://github.com/moshthepitt/flash-loan-mastery"
 }
@@ -33,12 +31,11 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
 // with these numbers total loan fee is 0.095% or 0.1% if there is a referral
 pub static LOAN_FEE: u128 = 900;
-pub static ADMIN_FEE: u128 = 50;
+pub static REFERRAL_FEE: u128 = 50;
 pub static LOAN_FEE_DENOMINATOR: u128 = 10000;
 pub static ONE_HUNDRED: u128 = 100;
 
 pub static POOL_SEED: &[u8] = b"flash_loan";
-pub static ADMIN_KEY: Pubkey = static_pubkey!("8JJxe21mwJezmU5y9NxTWUxc9stkEkwcP1deRzL2Kc7s");
 
 #[must_use]
 /// Get the Anchor instruction identifier
@@ -207,7 +204,7 @@ pub mod flash_loan_mastery {
 
         // get expected repay amount
         let fee = u64::try_from(
-            u128::from(amount) * (LOAN_FEE + ADMIN_FEE * 2) / (LOAN_FEE_DENOMINATOR * ONE_HUNDRED),
+            u128::from(amount) * (LOAN_FEE + REFERRAL_FEE) / (LOAN_FEE_DENOMINATOR * ONE_HUNDRED),
         )
         .unwrap();
         let expected_repayment = amount.checked_add(fee).unwrap();
@@ -230,7 +227,7 @@ pub mod flash_loan_mastery {
                             FlashLoanError::AddressMismatch
                         );
                         require_keys_eq!(
-                            ixn.accounts[4].pubkey,
+                            ixn.accounts[3].pubkey,
                             ctx.accounts.pool_authority.key(),
                             FlashLoanError::PoolMismatch
                         );
@@ -292,11 +289,12 @@ pub mod flash_loan_mastery {
             FlashLoanError::ProgramMismatch
         );
 
-        // get admin fee
+        // get referral fee
         let original_amt = LOAN_FEE_DENOMINATOR * ONE_HUNDRED * u128::from(amount)
-            / ((LOAN_FEE_DENOMINATOR * ONE_HUNDRED) + LOAN_FEE + ADMIN_FEE * 2);
-        let admin_fee =
-            u64::try_from(original_amt * ADMIN_FEE / (LOAN_FEE_DENOMINATOR * ONE_HUNDRED)).unwrap();
+            / ((LOAN_FEE_DENOMINATOR * ONE_HUNDRED) + LOAN_FEE + REFERRAL_FEE);
+        let referral_fee =
+            u64::try_from(original_amt * REFERRAL_FEE / (LOAN_FEE_DENOMINATOR * ONE_HUNDRED))
+                .unwrap();
 
         // should we pay a referral fee?
         let mut pay_referral_fee = false;
@@ -317,21 +315,9 @@ pub mod flash_loan_mastery {
                     authority: ctx.accounts.repayer.to_account_info(),
                 },
             ),
-            amount.checked_sub(admin_fee.checked_mul(2).unwrap()).unwrap(),
+            amount.checked_sub(referral_fee).unwrap(),
         )?;
-        // transfer to admin (just admin fee)
-        anchor_spl::token::transfer(
-            CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                anchor_spl::token::Transfer {
-                    from: ctx.accounts.token_from.to_account_info(),
-                    to: ctx.accounts.admin_token_to.to_account_info(),
-                    authority: ctx.accounts.repayer.to_account_info(),
-                },
-            ),
-            admin_fee,
-        )?;
-        // transfer referral fee (equivalent to admin fee)
+        // transfer referral fee
         if pay_referral_fee {
             anchor_spl::token::transfer(
                 CpiContext::new(
@@ -342,7 +328,7 @@ pub mod flash_loan_mastery {
                         authority: ctx.accounts.repayer.to_account_info(),
                     },
                 ),
-                admin_fee,
+                referral_fee,
             )?;
         }
 
@@ -554,13 +540,6 @@ pub struct Repay<'info> {
         constraint = token_to.owner == pool_authority.key() @FlashLoanError::OwnerMismatch,
     )]
     pub token_to: Account<'info, TokenAccount>,
-
-    /// The token to receive tokens repaid into the pool
-    #[account(
-        mut,
-        constraint = admin_token_to.owner == ADMIN_KEY @FlashLoanError::OwnerMismatch,
-    )]
-    pub admin_token_to: Account<'info, TokenAccount>,
 
     /// The pool authority
     /// CHECK: checked with seeds & in token program
