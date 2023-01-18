@@ -29,7 +29,7 @@ security_txt! {
 
 declare_id!("1oanfPPN8r1i4UbugXHDxWMbWVJ5qLSN5qzNFZkz6Fg");
 
-// with these numbers total loan fee is 0.095% or 0.1% if there is a referral
+// with these numbers total loan fee is 0.09% or 0.095% if there is a referral
 pub static LOAN_FEE: u128 = 900;
 pub static REFERRAL_FEE: u128 = 50;
 pub static LOAN_FEE_DENOMINATOR: u128 = 10000;
