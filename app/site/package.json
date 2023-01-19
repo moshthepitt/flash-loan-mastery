@@ -1,0 +1,45 @@
+{
+  "name": "flash-loan-mastery-website",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "devDependencies": {
+    "@11ty/eleventy": "^1.0.2",
+    "@11ty/eleventy-img": "^2.0.1",
+    "@11ty/eleventy-plugin-rss": "^1.2.0",
+    "@11ty/eleventy-plugin-syntaxhighlight": "^4.2.0",
+    "@babel/core": "^7.20.12",
+    "@babel/preset-env": "^7.20.2",
+    "@fullhuman/postcss-purgecss": "^5.0.0",
+    "autoprefixer": "^10.4.13",
+    "babel-loader": "^9.1.2",
+    "css-loader": "^6.7.3",
+    "cssnano": "^5.1.14",
+    "eleventy-plugin-reading-time": "^0.0.1",
+    "html-minifier": "^4.0.0",
+    "mini-css-extract-plugin": "^2.7.2",
+    "npm-run-all": "^4.1.5",
+    "postcss": "^8.4.21",
+    "postcss-color-mod-function": "^3.0.3",
+    "postcss-import": "^15.1.0",
+    "postcss-loader": "^7.0.2",
+    "postcss-preset-env": "^7.8.3",
+    "terser-webpack-plugin": "^5.3.6",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^5.0.1",
+    "webpack-manifest-plugin": "^5.0.0"
+  },
+  "scripts": {
+    "dev": "run-p dev:*",
+    "start": "eleventy --serve",
+    "build": "run-s clean build:assets build:site",
+    "dev:assets": "env ELEVENTY_ENV=development webpack --mode production --watch",
+    "dev:site": "env ELEVENTY_ENV=development eleventy --serve",
+    "build:assets": "webpack --mode production",
+    "build:site": "env ELEVENTY_ENV=production eleventy",
+    "clean": "rm -rf ./public"
+  },
+  "dependencies": {
+    "remove": "^0.1.5"
+  }
+}

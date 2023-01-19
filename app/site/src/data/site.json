@@ -1,0 +1,47 @@
+{
+  "name": "Flash Loan Mastery",
+  "description": "Flash Loan Mastery is the simplest and best Solana flash loans provider.",
+  "url": "https://flashloanmastery.com",
+  "author": {
+    "name": "mosh",
+    "twitterHandle": "moshthepitt"
+  },
+  "defaultSocialImage": "/images/default-social-image.png",
+  "headerLinks": [
+    {
+      "text": "Home",
+      "url": "/",
+      "external": false
+    },
+    {
+      "text": "Blog",
+      "url": "/blog",
+      "external": false
+    },
+    {
+      "text": "About",
+      "url": "/about",
+      "external": false
+    }
+  ],
+  "socialLinks": [
+    {
+      "text": "GitHub",
+      "url": "https://github.com/moshthepitt/flash-loan-mastery",
+      "external": true
+    },
+    {
+      "text": "Contract",
+      "url": "https://explorer.solana.com/address/1oanfPPN8r1i4UbugXHDxWMbWVJ5qLSN5qzNFZkz6Fg",
+      "external": true
+    }
+  ],
+  "footerLinks": [
+    {
+      "text": "RSS",
+      "url": "/feed.xml",
+      "external": true
+    }
+  ],
+  "showFooterAttribution": true
+}
