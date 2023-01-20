@@ -1,0 +1,47 @@
+---
+title: Javascript SDK
+date: '2023-01-20'
+tags: [code, flash-loan-mastery, js-sdk]
+description: All about the Flash Loan Mastery Javascript Software Development Kit (SDK).
+permalink: posts/{{ title | slug }}/index.html
+---
+
+Our Javascript SDK is a tool that allows you to interact with our smart contract.
+
+## Installation
+
+Our published package can be found here on [npm](https://www.npmjs.com/package/flash-loan-mastery).
+
+```sh
+yarn add flash-loan-mastery
+```
+
+```sh
+npm install flash-loan-mastery
+```
+
+## Usage
+
+A really really good example of how to use the Javascript SDK can be found [here](https://github.com/moshthepitt/flash-loan-mastery-cli/blob/master/src/flm.ts).  Please have a look at that as what follows is a very brief overview of what the SDK does.
+
+### 1. initPool
+
+Initializes a new flash loan pool for a given token mint. Use this when you want to enable flash loans for a particular Solana token e,g. USDC or even your own token.
+
+### 2. deposit
+
+Deposit tokens to a flash loan pool.  For instance, if you have USDC you can deposit it into the USDC pool and make it available for people to borrow.  You will then earn part of the flash loan interest.
+
+This instruction will result in your getting pool share tokens that represent your deposit and share of the pool profits.  Keep these safe as you will need them during withdrawal.
+
+### 3. withdraw
+
+Withdraw tokens from a flash loan pool.  This will withdraw your previous deposits as well as any accumulated earned interest.
+
+This instruction will consume your pool share tokens that you received during the deposit stage.
+
+### 4. flashLoan
+
+Initiate a flash loan transaction.  This outputs two instructions representing the flash loan borrow and repay for you to use as you please.  It also outputs the expected repayment amount for convenience.
+
+The flash loan transaction should have the **borrow** instruction first, and the **repay** instruction last and must not be a [CPI](https://docs.solana.com/developing/programming-model/calling-between-programs).
