@@ -37,3 +37,27 @@ You can also run yarn start help command to see what each command is for. e.g.
 ```sh
 yarn start help deposit
 ```
+
+## Examples
+
+### initPool
+
+To get help on this command:
+
+```sh
+yarn start help init-pool
+```
+
+To set up a new pool:
+
+```sh
+yarn start init-pool -k ~/.config/solana/id.json -tm DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263 -pm EEgkPj5Z4J9KMCFSchiMz9wGusJgw6wqGPMyMJT9hoEZ
+```
+
+Note that the `pm` (Pool Mint) option:
+
+- should be a new mint that is owned by the user
+- should not have any tokens issued
+- should have the same number of decimals as the `tm` (Token Mint) option
+
+Note that a pool for any mint can only bet up once, and this can be done by anyone.
