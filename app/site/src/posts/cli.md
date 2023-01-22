@@ -1,7 +1,7 @@
 ---
 title: Flash Loan Mastery CLI
 date: '2023-01-22'
-tags: [code, flash-loan-mastery, cli, usage]
+tags: [code, flash-loan-mastery, cli, usage, bonk, versioned-transactions]
 description: All about the Flash Loan Mastery CLI tool.
 permalink: posts/{{ title | slug }}/index.html
 ---
@@ -89,3 +89,45 @@ For example, to withdraw some USDC:
 ```sh
 yarn start withdraw -k /path/to/solana-wallet.json -tm EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v -ptf 6H7ahCDN8hny2mWKoQBycUqLXoq4aaZ6V32rpmh99eGr -a 4.249834
 ```
+
+### Example Flash Loan
+
+To get help on this command:
+
+```sh
+yarn start help example-flash-loan
+```
+
+For example, an example of a flash loan of 10 million BONK:
+
+```sh
+yarn start example-flash-loan -k /path/to/solana-wallet.json -tm DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263 -a 10000000
+```
+
+[Here is what the transaction itself](https://solana.fm/tx/5wbvKGpQcojidPoAr5Kc8xeJijy2UyYgu3ZrFCDkJL7DHbx4tmPd7wgafL54NMv6oxYDEf6JKw1yAaXYN5hx9f3J?cluster=mainnet-qn1) looks like.  We are fairly certain that this might be the very first BONK flash loan ever! :)
+
+### Example Flash Loan Using Versioned Transactions
+
+We support flash loans using Solana's [versioned transactions](https://docs.solana.com/developing/versioned-transactions).
+
+For example, for a versioned flash loan of 1,000 USDC:
+
+#### 1. Create keys/addresses that should be saved in the address lookup table
+
+```sh
+yarn start seed-example-flash-loan-lookup-table -k /path/to/solana-wallet.json -tm EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v -a 1000
+```
+#### 2. Create the address lookup table
+
+```sh
+yarn start create-versioned-flash-loan-lookup-table-from-cache -k /path/to/solana-wallet.json -tm EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGG
+kZwyTDt1v
+```
+
+#### 3. Execute the flash loan using versioned transactions
+
+```sh
+yarn start example-versioned-flash-loan -k /path/to/solana-wallet.json -tm EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v -a 1000
+```
+
+[Here is what this versioned flash loan transaction](https://solana.fm/tx/2utP7HZNCbx3BtZSNuZbpmhDz1Gxbw7h1MygPjvVEo1MQry7VHPqHxevXy5AEYiFkJFsdBMg7vaWXW6iKWz8jmkv?cluster=mainnet-qn1) ends up looking like.
