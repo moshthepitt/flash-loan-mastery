@@ -40,7 +40,7 @@ yarn start help deposit
 
 ## Examples
 
-### initPool
+### Init Pool
 
 To get help on this command:
 
@@ -51,7 +51,7 @@ yarn start help init-pool
 To set up a new pool:
 
 ```sh
-yarn start init-pool -k ~/.config/solana/id.json -tm DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263 -pm EEgkPj5Z4J9KMCFSchiMz9wGusJgw6wqGPMyMJT9hoEZ
+yarn start init-pool -k /path/to/solana-wallet.json -tm DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263 -pm EEgkPj5Z4J9KMCFSchiMz9wGusJgw6wqGPMyMJT9hoEZ
 ```
 
 Note that the `pm` (Pool Mint) option:
@@ -61,3 +61,31 @@ Note that the `pm` (Pool Mint) option:
 - should have the same number of decimals as the `tm` (Token Mint) option
 
 Note that a pool for any mint can only bet up once, and this can be done by anyone.
+
+### Deposit
+
+To get help on this command:
+
+```sh
+yarn start help deposit
+```
+
+For example, to deposit some [BONK](https://twitter.com/bonk_inu):
+
+```sh
+yarn start deposit -k /path/to/solana-wallet.json -tm DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263 -tf Hm4ebPskgjJVesKLowyEhpLW6axodBbH82k5CHz3ynSa -a 10310517.49915
+```
+
+### Withdraw
+
+To get help on this command:
+
+```sh
+yarn start help withdraw
+```
+
+For example, to withdraw some USDC:
+
+```sh
+yarn start withdraw -k /path/to/solana-wallet.json -tm EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v -ptf 6H7ahCDN8hny2mWKoQBycUqLXoq4aaZ6V32rpmh99eGr -a 4.249834
+```
