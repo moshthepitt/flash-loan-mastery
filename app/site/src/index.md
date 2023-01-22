@@ -18,3 +18,7 @@ Our aim is to make Flash Loan Mastery as simple as possible, with very easy to u
 - **Arbitrage**: traders might earn by spotting price discrepancies across several different exchanges and exploiting them
 - **Collateral swaps**: quickly replace another type of collateral for the collateral used to secure the user's loan
 - **Interest rate swaps**: quickly move from one lending platform to another in search of better interest rates
+
+## How much does it cost?
+
+We charge a flat fee of **0.095%** for each successful flash loan.  [Read more](/posts/charges-and-fees/).

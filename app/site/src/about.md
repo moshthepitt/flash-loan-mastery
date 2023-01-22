@@ -24,6 +24,10 @@ There are three steps involved when using Flash Loan Mastery:
 
 Our [javascript SDK](https://github.com/moshthepitt/flash-loan-mastery-js) can be used to do interact with Flash Loan Mastery.
 
+## How much does it cost?
+
+We charge a flat fee of **0.095%** for each successful flash loan.  [Read more](/posts/charges-and-fees/).
+
 ## Source Code
 
 1. [Smart contract](https://github.com/moshthepitt/flash-loan-mastery)
