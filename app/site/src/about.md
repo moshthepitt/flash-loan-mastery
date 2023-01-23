@@ -33,6 +33,7 @@ We charge a flat fee of **0.095%** for each successful flash loan.  [Read more](
 1. [Smart contract](https://github.com/moshthepitt/flash-loan-mastery)
 2. [Javascript SDK](https://github.com/moshthepitt/flash-loan-mastery-js)
 3. [CLI tool](https://github.com/moshthepitt/flash-loan-mastery-cli)
+3. [Jupiter Arbitrage Trading](https://github.com/moshthepitt/flm-jupiter-arb)
 
 ## Deployments
 

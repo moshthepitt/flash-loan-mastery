@@ -15,7 +15,7 @@ Our aim is to make Flash Loan Mastery as simple as possible, with very easy to u
 
 ## What can it be used for?
 
-- **Arbitrage**: traders might earn by spotting price discrepancies across several different exchanges and exploiting them
+- **Arbitrage**: traders might earn by spotting price discrepancies across several different exchanges and exploiting them. [Read more](/posts/jupiter-arbitrage/)
 - **Collateral swaps**: quickly replace another type of collateral for the collateral used to secure the user's loan
 - **Interest rate swaps**: quickly move from one lending platform to another in search of better interest rates
 
