@@ -38,8 +38,7 @@ yarn start create-token-accounts -k /path/to/solana-wallet.json
 Then the actual arb command:
 
 ```sh
-yarn start simple-jupiter-arb -k /path/to/solana-wallet.json -m1 DezXAZ8z7PnrnRJjz3wX -m2 EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
-BoRgixCa6xjnB7YaB1pPB263 -a 1000000
+yarn start simple-jupiter-arb -k /path/to/solana-wallet.json -m1 DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263 -m2 EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v -a 1000000
 ```
 
 [Here is what a profitable transaction would look like](https://solscan.io/tx/2wbbaNidGLfefRGkfJQwVCVgCkV8X8yaJLZ3gGqwu5Bhzmnh6dLF2dfZmAYTPDoCrzGpryCuZP75eNGWT4NgJLLJ).

@@ -120,8 +120,7 @@ yarn start seed-example-flash-loan-lookup-table -k /path/to/solana-wallet.json -
 #### 2. Create the address lookup table
 
 ```sh
-yarn start create-versioned-flash-loan-lookup-table-from-cache -k /path/to/solana-wallet.json -tm EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGG
-kZwyTDt1v
+yarn start create-versioned-flash-loan-lookup-table-from-cache -k /path/to/solana-wallet.json -tm EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
 ```
 
 #### 3. Execute the flash loan using versioned transactions
