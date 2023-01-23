@@ -15,7 +15,14 @@ permalink: posts/{{ title | slug }}/index.html
 yarn
 ```
 3. Locate or [setup your file system wallet](https://docs.solana.com/wallet-guide/file-system-wallet#:~:text=A%20file%20system%20wallet%20exists,system%20wallet%20is%20not%20recommended.) file.
-4. Run `yarn start help` to see all the commands.
+4. Set up a file named `.env` (right next to where the file named .env.sample is located) and put in at least the Solana RPC URL you want to use.  The file contents would be something like this:
+
+```yaml
+NODE_ENV=production
+RPC_URI=https://api.mainnet-beta.solana.com
+FLM_PROGRAM_ID=1oanfPPN8r1i4UbugXHDxWMbWVJ5qLSN5qzNFZkz6Fg
+```
+5. Run `yarn start help` to see all the commands.
 
 ```sh
 yarn start help
