@@ -1,7 +1,7 @@
 ---
 title: Flash Loan Mastery Javascript SDK
 date: '2023-01-20'
-tags: [code, flash-loan-mastery, js-sdk]
+tags: [code, flash-loan-mastery, js-sdk, developer]
 description: All about the Flash Loan Mastery Javascript Software Development Kit (SDK).
 permalink: posts/{{ title | slug }}/index.html
 ---
