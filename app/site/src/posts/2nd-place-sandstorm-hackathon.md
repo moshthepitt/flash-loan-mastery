@@ -14,4 +14,4 @@ As we said in our [hackathon submission](https://discord.com/channels/1033504592
 
 Here's a fun fact: to date, Flash Loan Mastery is the only **award-winning** flash loan program in the Solana ecosystem. Nice, eh? 😂🔥
 
-Quick, here is [how you can get started](http://localhost:8080/about/).
+Quick, here is [how you can get started](/about/).
