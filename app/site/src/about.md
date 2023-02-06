@@ -22,7 +22,7 @@ There are three steps involved when using Flash Loan Mastery:
 2. Interact with smart contracts for other operations
 3. Return the funds
 
-Our [javascript SDK](https://github.com/moshthepitt/flash-loan-mastery-js) can be used to do interact with Flash Loan Mastery.
+Our [javascript SDK](https://github.com/moshthepitt/flash-loan-mastery-js) can be used to interact with Flash Loan Mastery.
 
 ## How much does it cost?
 
